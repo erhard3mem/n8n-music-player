@@ -1,0 +1,265 @@
+{
+  "name": "n8n-music-player",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -624,
+        -288
+      ],
+      "id": "29cb4819-b047-4660-8e65-c4b3609cfddf",
+      "name": "When chat message received",
+      "webhookId": "5e930684-f272-4960-809c-41f79f9f06a9"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=User message: {{ $('When chat message received').item.json.chatInput }}\n\nHere is the track list:\n{{ JSON.stringify($json.data) }}\n\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        432,
+        -288
+      ],
+      "id": "78005f78-954f-4a93-892e-889400c2d2d0",
+      "name": "AI Agent",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "model": "llama3.1:latest",
+        "options": {
+          "format": "json"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        336,
+        -80
+      ],
+      "id": "b6f39358-9e93-4a5c-8efd-25567f752ecf",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "epNNdhap4bB1w2aj",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        192,
+        -288
+      ],
+      "id": "73ca632b-53fd-409b-b702-af8952d12005",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b75c616d-e8b7-487c-877c-2ea2b25794d3",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "e1fa5798-28cc-4a75-a0dc-b250d38b5ba4",
+              "name": "artist",
+              "value": "={{ $json.artist }}",
+              "type": "string"
+            },
+            {
+              "id": "11644491-5af7-49a0-b393-932b4ab4f99e",
+              "name": "genre",
+              "value": "={{ $json.genre[0] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -160,
+        -288
+      ],
+      "id": "1bc393a4-5c80-407a-b998-5d72af7a7445",
+      "name": "Prepare JSON"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/music",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -368,
+        -288
+      ],
+      "id": "9fef4814-ada2-455d-afcb-40108da83dfd",
+      "name": "Scan for music"
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "objects = []\n\nfor item in _input.all():\n    try:\n        title = item.json.title.lower()\n        # Exclude items where title contains '.mp3' or '.flac'\n        if '.mp3' in title or '.flac' in title:\n            continue  # skip this item\n\n        # Only include items with artist not None\n        if item.json.artist is not None:\n            objects.append(item)\n    except Exception as e:\n        # In case some items don't have title or artist keys\n        continue\n\nreturn objects\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        -288
+      ],
+      "id": "16dfaf51-6c37-4489-88a4-2b9156bf154a",
+      "name": "Clean Up JSON"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/play",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        768,
+        -288
+      ],
+      "id": "86558b96-c5c2-417d-b64f-2ebf728f10db",
+      "name": "Music player"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        496,
+        -80
+      ],
+      "id": "eebdd4a8-f351-4d3e-82cd-14bd8007daeb",
+      "name": "Simple Memory"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Scan for music",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Music player",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare JSON": {
+      "main": [
+        [
+          {
+            "node": "Clean Up JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scan for music": {
+      "main": [
+        [
+          {
+            "node": "Prepare JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Up JSON": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d3330e38-3e3f-47fe-ba4a-7e464de7393d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4a55a38bf2ae98f5ce6991c61aa333c73fe861a88374d52933a6af186e02e80b"
+  },
+  "id": "ydHKKr5kQ3BSmkrB",
+  "tags": []
+}
